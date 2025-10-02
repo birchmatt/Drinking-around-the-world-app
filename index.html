@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EPCOT Drink Tracker v4</title>
+    <title>EPCOT Drink Tracker</title>
     <style>
         * {
             margin: 0;
@@ -113,7 +113,11 @@
         }
         
         .form-group select,
-        .form-group input {
+        .form-group input[type="text"],
+        .form-group input[type="date"],
+        .form-group input[type="time"],
+        .form-group input[type="number"],
+        .form-group input[type="url"] {
             width: 100%;
             padding: 12px;
             border: 2px solid #ddd;
@@ -166,6 +170,45 @@
             min-width: 60px;
         }
         
+        .photo-upload-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 2px dashed #ddd;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .photo-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            margin: 10px auto;
+            display: block;
+        }
+        
+        .photo-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        
+        .photo-thumbnail {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid #ddd;
+            transition: transform 0.2s;
+        }
+        
+        .photo-thumbnail:hover {
+            transform: scale(1.1);
+            border-color: #667eea;
+        }
+        
         .btn {
             padding: 12px 30px;
             border: none;
@@ -176,6 +219,11 @@
             transition: all 0.3s;
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+        
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 0.9em;
         }
         
         .btn-primary {
@@ -247,7 +295,7 @@
             margin-bottom: 15px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             display: grid;
-            grid-template-columns: 2fr 1fr 1fr 1fr 80px auto;
+            grid-template-columns: 60px 2fr 1fr 1fr 1fr 80px auto;
             gap: 15px;
             align-items: center;
         }
@@ -331,6 +379,7 @@
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            overflow-y: auto;
         }
         
         .modal.active {
@@ -369,6 +418,18 @@
             line-height: 1.6;
         }
         
+        .photo-modal .modal-content {
+            max-width: 90vw;
+            max-height: 90vh;
+            padding: 20px;
+        }
+        
+        .photo-modal img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 10px;
+        }
+        
         .comparison-result {
             background: white;
             border-radius: 10px;
@@ -402,6 +463,18 @@
             display: block;
             color: #667eea;
             margin-bottom: 5px;
+        }
+        
+        .photo-options {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+        
+        .photo-option-label {
+            font-size: 0.9em;
+            color: #666;
         }
         
         @media (max-width: 768px) {
@@ -510,6 +583,30 @@
                         <input type="hidden" id="rating" value="0">
                     </div>
                     
+                    <div class="form-group">
+                        <label>Add Photo (optional)</label>
+                        <div class="photo-upload-section">
+                            <div id="photoPreviewContainer" class="hidden">
+                                <img id="photoPreview" class="photo-preview">
+                                <button type="button" class="btn btn-danger btn-small" onclick="removePhoto()">Remove Photo</button>
+                            </div>
+                            <div id="photoUploadButtons">
+                                <p style="color: #666; margin-bottom: 10px;">📸 Capture or upload a photo of your drink</p>
+                                <div class="photo-buttons">
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('photoFile').click()">📁 Upload Photo</button>
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('photoCamera').click()">📷 Take Photo</button>
+                                </div>
+                                <div class="photo-options">
+                                    <span class="photo-option-label">Or paste image URL:</span>
+                                    <input type="url" id="photoUrl" placeholder="https://..." style="flex: 1; padding: 8px;">
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="loadPhotoFromUrl()">Load</button>
+                                </div>
+                                <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoUpload(event)">
+                                <input type="file" id="photoCamera" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoUpload(event)">
+                            </div>
+                        </div>
+                    </div>
+                    
                     <button type="submit" class="btn btn-primary">Add Drink</button>
                 </form>
             </div>
@@ -597,6 +694,13 @@
         </div>
     </div>
     
+    <div class="modal photo-modal" id="photoModal">
+        <div class="modal-content">
+            <img id="photoModalImage" src="">
+            <button class="btn btn-secondary" onclick="closePhotoModal()" style="margin-top: 15px; width: 100%;">Close</button>
+        </div>
+    </div>
+    
     <div class="modal" id="compareModal">
         <div class="modal-content" style="max-width: 800px;">
             <h3>Comparison with Friend</h3>
@@ -621,6 +725,11 @@
                 {name: "Horchata", price: 6.75},
                 {name: "Jarritos", price: 4.25}
             ],
+            "Mexico - F&W": [
+                {name: "Clarita Margarita (NEW)", price: 14.00},
+                {name: "Strawberry-Pomegranate Margarita (NEW)", price: 14.00},
+                {name: "Mexican Craft Beer", price: 12.00}
+            ],
             "Norway": [
                 {name: "Frozen Viking Coffee", price: 15.50},
                 {name: "Nordic Draft Beer", price: 13.75},
@@ -638,12 +747,26 @@
                 {name: "Tsingtao Beer", price: 9.50},
                 {name: "Bubble Milk Tea", price: 7.25}
             ],
+            "China - F&W": [
+                {name: "Frozen Strawberry-Jasmine Cocktail (NEW)", price: 13.00},
+                {name: "Hainan Prosperity (NEW)", price: 13.00},
+                {name: "Baijiu Punch", price: 13.00},
+                {name: "Brew Hub Lychee Foo Draft Beer", price: 12.00},
+                {name: "Mango Peach Bubble Tea (Non-alcoholic)", price: 7.25}
+            ],
             "Germany": [
                 {name: "Schöfferhofer Pink Grapefruit Hefeweizen", price: 11.50},
                 {name: "Warsteiner Dunkel", price: 11.00},
                 {name: "Bärenjäger Honey & Bourbon", price: 14.50},
                 {name: "Beer Flight", price: 15.00},
                 {name: "LeBlanc Sparkling Lemonade", price: 5.50}
+            ],
+            "Germany - F&W": [
+                {name: "Schöfferhofer Berry-Lime Hefeweizen (NEW)", price: 12.00},
+                {name: "von Trapp Brewing Oktoberfest Märzen Lager (NEW)", price: 12.00},
+                {name: "Selbach-Oster Riesling QbA", price: 13.00},
+                {name: "Weihenstephaner Festbier", price: 12.00},
+                {name: "Beer Flight", price: 15.00}
             ],
             "Italy": [
                 {name: "Italian Margarita", price: 12.00},
@@ -655,6 +778,16 @@
                 {name: "Naufrago", price: 9.75},
                 {name: "San Pellegrino Sparkling Water", price: 4.50}
             ],
+            "Italy - F&W": [
+                {name: "Bellini Spritz", price: 13.00},
+                {name: "Italian-inspired Blood Orange Margarita", price: 13.00},
+                {name: "Sorsi d'Oro Italian Pilsner (NEW)", price: 12.00},
+                {name: "Prosecco", price: 13.00},
+                {name: "Moscato", price: 12.00},
+                {name: "Chianti", price: 13.00},
+                {name: "Italian Red Sangria", price: 13.00},
+                {name: "Peroni Pilsner", price: 11.00}
+            ],
             "The American Adventure": [
                 {name: "Tennessee Lemonade", price: 16.50},
                 {name: "Moonshine Sour", price: 14.00},
@@ -665,11 +798,26 @@
                 {name: "The American Dream Slush", price: 6.50},
                 {name: "Frozen Coca-Cola", price: 5.50}
             ],
+            "The American Adventure - F&W": [
+                {name: "Frozen Pineapple-Chipotle Lemonade (Non-alcoholic)", price: 6.50},
+                {name: "Frozen Pineapple-Chipotle Lemonade with Vodka", price: 14.00},
+                {name: "Cherry-Lime Slush (NEW/Non-alcoholic)", price: 6.00},
+                {name: "Harpoon Brewery Flannel Friday Hoppy Amber Ale (NEW)", price: 12.00},
+                {name: "Playalinda Brewing Co. Pumpkin Cheesecake Blonde Stout (NEW)", price: 12.00},
+                {name: "von Trapp Brewing Natür Helles Lager (NEW)", price: 12.00},
+                {name: "Beer Flight", price: 15.00}
+            ],
             "Japan": [
                 {name: "Violet Sake", price: 12.00},
                 {name: "Sake Mist", price: 15.00},
                 {name: "Kirin Ichiban Beer", price: 10.75},
                 {name: "Ramune Soda", price: 5.75}
+            ],
+            "Japan - F&W": [
+                {name: "Sake-Politan Cocktail (NEW)", price: 13.00},
+                {name: "Sparkling Sake Otokoyama (NEW)", price: 14.00},
+                {name: "Brewlando Brewing Fuji Apple IPA (NEW)", price: 12.00},
+                {name: "Peachy Mango Boba (NEW/Non-alcoholic)", price: 7.00}
             ],
             "Morocco": [
                 {name: "House-made Sangria", price: 14.00},
@@ -678,6 +826,13 @@
                 {name: "Strawberry Daiquiri", price: 15.50},
                 {name: "Casa Beer", price: 10.50},
                 {name: "Mint Iced Tea", price: 5.25}
+            ],
+            "Morocco - F&W": [
+                {name: "Sparkling Fig Cocktail", price: 13.00},
+                {name: "Keel Farms Blackberry Pear Hard Cider", price: 12.00},
+                {name: "Keel Farms Golden Apple Chai Hard Cider (NEW)", price: 12.00},
+                {name: "Playalinda Brewing Co. Fig, Rhubarb, Orange and Ginger Hard Cider (NEW)", price: 12.00},
+                {name: "Hard Cider Flight", price: 15.00}
             ],
             "France": [
                 {name: "Grand Marnier Orange Slush", price: 15.95},
@@ -688,6 +843,11 @@
                 {name: "L'Artisan des Glaces Ice Cream Martini", price: 7.50},
                 {name: "La Vie Orange Sparkling Water", price: 5.25}
             ],
+            "France - F&W": [
+                {name: "Chilled French Cosmo", price: 13.00},
+                {name: "L'Oceade Atlantique Sauvignon Blanc (NEW)", price: 13.00},
+                {name: "Instant Becot Bordeaux (NEW)", price: 14.00}
+            ],
             "United Kingdom": [
                 {name: "Leaping Leprechaun", price: 15.00},
                 {name: "Snake Bite Imperial Pint", price: 11.50},
@@ -697,6 +857,9 @@
                 {name: "Welsh Dragon", price: 14.50},
                 {name: "English Breakfast Tea", price: 4.50}
             ],
+            "United Kingdom - F&W": [
+                {name: "Strawberry Basil Cocktail", price: 13.00}
+            ],
             "Canada": [
                 {name: "Ottawa Apple", price: 16.50},
                 {name: "Moosehead Draft", price: 10.75},
@@ -704,6 +867,133 @@
                 {name: "Ice Wine", price: 14.00},
                 {name: "Maple Soda", price: 6.00},
                 {name: "Maple Popcorn", price: 6.50}
+            ],
+            "Canada - F&W": [
+                {name: "Château des Charmes Pétales Rouge (NEW)", price: 13.00},
+                {name: "Collective Arts Brewing Pilsner (NEW)", price: 12.00}
+            ],
+            "The Alps - F&W": [
+                {name: "Stiegl Brewery Goldbräu Austrian Märzen Lager (NEW)", price: 12.00},
+                {name: "Frozen Rosé", price: 13.00},
+                {name: "Yalumba 'The Y Series' Viognier", price: 13.00},
+                {name: "Bulletin Place Sauvignon Blanc", price: 13.00},
+                {name: "Fowles Wine Farm to Table Shiraz", price: 13.00},
+                {name: "Wine Flight", price: 15.00}
+            ],
+            "Australia - F&W": [
+                {name: "Bulletin Place Sauvignon Blanc", price: 13.00},
+                {name: "Fowles Farm to Table Shiraz", price: 13.00},
+                {name: "Yalumba 'The Y Series' Viognier", price: 13.00},
+                {name: "Wine Flight", price: 15.00}
+            ],
+            "Belgium - F&W": [
+                {name: "Belgian Chilled Coffee (Non-alcoholic)", price: 6.00},
+                {name: "Brouwerij St Bernardus Dragòn Wit Wheat Beer", price: 12.00},
+                {name: "Brouwerij Verhaeghe Vichte Duchesse Cherry Red Ale", price: 12.00},
+                {name: "Brouwerij Van Steenberge Gulden Draak Tripel Ale", price: 13.00},
+                {name: "Beer Flight", price: 15.00},
+                {name: "Belgian Chilled Coffee with ChocoLat Deluxe Salted Caramel Chocolate Liqueur", price: 13.00}
+            ],
+            "Brazil - F&W": [
+                {name: "81Bay Brewing Co. Bossa Nova Lager", price: 12.00},
+                {name: "Frozen Caipirinha with Cachaça Spirit", price: 13.00}
+            ],
+            "Greece - F&W": [
+                {name: "Greek Melon Limeade", price: 13.00},
+                {name: "Mylonas Winery Assyrtiko White Wine", price: 13.00},
+                {name: "Skouras Zoe Rosé", price: 13.00},
+                {name: "Kir-Yianni Naoussa Xinomavro Dry Red Wine", price: 14.00},
+                {name: "Wine Flight", price: 15.00}
+            ],
+            "India - F&W": [
+                {name: "Mango Lassi (Non-alcoholic)", price: 6.00},
+                {name: "Mango Lassi with Camikara 8 Year Old Cask Aged Rum", price: 13.00},
+                {name: "Sula Tropicale Brut Sparkling Wine", price: 13.00},
+                {name: "United Breweries Taj Mahal Premium Lager", price: 12.00}
+            ],
+            "Spain - F&W": [
+                {name: "Summer in Spain (NEW)", price: 13.00},
+                {name: "Quinta del '67 Garnacha Tintorera", price: 13.00}
+            ],
+            "Bramblewood Bites - F&W": [
+                {name: "GoGi Pinot Noir", price: 13.00},
+                {name: "81Bay Brewing Co. Nitro Bananas Foster Cream Ale (NEW)", price: 12.00},
+                {name: "Spiced Apple Old Fashioned with Boyd & Blair Rum", price: 14.00}
+            ],
+            "Brew-Wing Lab - F&W": [
+                {name: "Frozen Pomegranate & Raspberry Tea (Non-alcoholic)", price: 6.00},
+                {name: "Pickle Milk Shake (Non-alcoholic)", price: 6.00},
+                {name: "Boulevard Brewing Co. Space Camper Juice Nova Superstellar IPA (NEW)", price: 12.00},
+                {name: "BrewDog 95 Tropical Session IPA (NEW)", price: 12.00},
+                {name: "Crooked Can Brewing Company Raspberry Blanc Wheat Beer (NEW)", price: 12.00},
+                {name: "BRLO Wild Berries Hard Cider (NEW)", price: 12.00},
+                {name: "Ciderboys Pumpkin Spice Hard Cider (NEW)", price: 12.00},
+                {name: "Collective Arts Brewing Local Press Apple & Cherry Hard Cider (NEW)", price: 12.00},
+                {name: "Beer Flight", price: 15.00},
+                {name: "Hard Cider Flight", price: 15.00}
+            ],
+            "Coastal Eats - F&W": [
+                {name: "Boyd & Blair Pomegranate Codder", price: 13.00},
+                {name: "Rileys Lookout Sauvignon Blanc (NEW)", price: 13.00}
+            ],
+            "Connections Eatery - F&W": [
+                {name: "Passion Fruit Cream Slush (NEW/Non-alcoholic)", price: 6.00},
+                {name: "Passion Fruit Cream Slush with Rum (NEW)", price: 13.00},
+                {name: "Blackberry Lemonade (Non-alcoholic)", price: 6.00},
+                {name: "Watermelon-Mint Agua Fresca (Non-alcoholic)", price: 6.00}
+            ],
+            "Earth Eats - F&W": [
+                {name: "Minute Maid Strawberry-Hibiscus Aguas Frescas (NEW/Non-alcoholic)", price: 6.00},
+                {name: "Harken Barrel Fermented Chardonnay", price: 13.00}
+            ],
+            "Flavors from Fire - F&W": [
+                {name: "Swine Brine", price: 14.00},
+                {name: "Deschutes Brewery Black Butte Porter", price: 12.00},
+                {name: "Four Virtues Bourbon Barrel Zinfandel", price: 13.00}
+            ],
+            "The Fry Basket - F&W": [
+                {name: "Boyd & Blair Grapefruit Mule", price: 13.00},
+                {name: "3 Daughters Brewing Mojito Blonde Ale (NEW)", price: 12.00}
+            ],
+            "Forest & Field - F&W": [
+                {name: "Daou Vineyards Chardonnay (NEW)", price: 13.00},
+                {name: "Famille Hugel Classic Pinot Noir (NEW)", price: 14.00},
+                {name: "Brewery Ommegang All Hallows Treat Chocolate Peanut Butter Imperial Stout", price: 13.00}
+            ],
+            "Gyozas of the Galaxy - F&W": [
+                {name: "Pineapple Colada (NEW)", price: 13.00},
+                {name: "Willamette Valley Vineyards Pinot Gris (NEW)", price: 13.00}
+            ],
+            "Hawai'i - F&W": [
+                {name: "Maui Brewing Co Orange Mango Guava Hazy IPA", price: 12.00},
+                {name: "Florida Orange Groves Winery Sparkling Pineapple Wine", price: 13.00},
+                {name: "O'ahu Sunrise", price: 13.00}
+            ],
+            "Milled & Mulled - F&W": [
+                {name: "3 Daughters Brewing Apple Strudel Hard Cider (NEW)", price: 12.00},
+                {name: "Keel Farms Maple Harvest Hard Cider (NEW)", price: 12.00}
+            ],
+            "Refreshment Port - F&W": [
+                {name: "Brewery Ommegang Oak-Aged Watermelon Kolsch (NEW)", price: 12.00},
+                {name: "Florida Orange Groves Winery Sparkling Peach", price: 13.00},
+                {name: "Boyd & Blair Pumpkin Spice Mule", price: 13.00}
+            ],
+            "Shimmering Sips - F&W": [
+                {name: "Tropical Mimosa", price: 13.00},
+                {name: "Berry Mimosa", price: 13.00},
+                {name: "Blood Orange Mimosa", price: 13.00},
+                {name: "Mimosa Flight", price: 15.00}
+            ],
+            "Sunshine Seasons - F&W": [
+                {name: "Remy Milk Shake (NEW/Non-alcoholic)", price: 7.00}
+            ],
+            "Swirled Showcase - F&W": [
+                {name: "Coca-Cola Float (Non-alcoholic)", price: 6.00},
+                {name: "Barq's Creme Soda Float (Non-alcoholic)", price: 6.00},
+                {name: "Fanta Grape Float (Non-alcoholic)", price: 6.00},
+                {name: "Frozen Apple Pie (Non-alcoholic)", price: 7.00},
+                {name: "Früli Strawberry Belgian White Beer (NEW)", price: 12.00},
+                {name: "Strawberry Beer Float (NEW)", price: 13.00}
             ]
         };
 
@@ -711,8 +1001,146 @@
         let userName = '';
         let currentRating = 0;
         let editCurrentRating = 0;
+        let currentPhotoData = null;
+        let db;
         
-        function init() {
+        // Initialize IndexedDB
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('EpcotDrinkTracker', 1);
+                
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+                
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains('photos')) {
+                        db.createObjectStore('photos', { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+        
+        // Save photo to IndexedDB
+        async function savePhotoToDB(id, photoData) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['photos'], 'readwrite');
+                const store = transaction.objectStore('photos');
+                const request = store.put({ id: id, data: photoData });
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Get photo from IndexedDB
+        async function getPhotoFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['photos'], 'readonly');
+                const store = transaction.objectStore('photos');
+                const request = store.get(id);
+                
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Delete photo from IndexedDB
+        async function deletePhotoFromDB(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['photos'], 'readwrite');
+                const store = transaction.objectStore('photos');
+                const request = store.delete(id);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+        
+        // Compress image
+        function compressImage(file, maxWidth = 800, quality = 0.7) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        async function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            try {
+                const compressed = await compressImage(file);
+                currentPhotoData = compressed;
+                document.getElementById('photoPreview').src = compressed;
+                document.getElementById('photoPreviewContainer').classList.remove('hidden');
+                document.getElementById('photoUploadButtons').classList.add('hidden');
+            } catch (error) {
+                alert('Error processing photo: ' + error.message);
+            }
+        }
+        
+        function loadPhotoFromUrl() {
+            const url = document.getElementById('photoUrl').value.trim();
+            if (!url) return;
+            
+            currentPhotoData = { url: url };
+            document.getElementById('photoPreview').src = url;
+            document.getElementById('photoPreviewContainer').classList.remove('hidden');
+            document.getElementById('photoUploadButtons').classList.add('hidden');
+        }
+        
+        function removePhoto() {
+            currentPhotoData = null;
+            document.getElementById('photoPreview').src = '';
+            document.getElementById('photoPreviewContainer').classList.add('hidden');
+            document.getElementById('photoUploadButtons').classList.remove('hidden');
+            document.getElementById('photoUrl').value = '';
+        }
+        
+        function showPhotoModal(photoData) {
+            if (!photoData) return;
+            
+            const imgSrc = photoData.url || photoData;
+            document.getElementById('photoModalImage').src = imgSrc;
+            document.getElementById('photoModal').classList.add('active');
+        }
+        
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.remove('active');
+        }
+        
+        async function init() {
+            try {
+                await initDB();
+            } catch (error) {
+                console.error('Error initializing database:', error);
+            }
+            
             const savedName = localStorage.getItem('epcotUserName');
             if (savedName) {
                 userName = savedName;
@@ -817,7 +1245,7 @@
                 DRINKS_DATA[country].forEach(drink => {
                     const option = document.createElement('option');
                     option.value = JSON.stringify(drink);
-                    option.textContent = `${drink.name} - $${drink.price.toFixed(2)}`;
+                    option.textContent = `${drink.name} - ${drink.price.toFixed(2)}`;
                     drinkSelect.appendChild(option);
                 });
             }
@@ -829,7 +1257,7 @@
             document.getElementById('time').value = now.toTimeString().slice(0, 5);
         }
         
-        document.getElementById('drinkForm').addEventListener('submit', function(e) {
+        document.getElementById('drinkForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             if (currentRating === 0) {
@@ -843,8 +1271,10 @@
             const time = document.getElementById('time').value;
             const customName = document.getElementById('customName').value;
             
+            const drinkId = Date.now();
+            
             const drink = {
-                id: Date.now(),
+                id: drinkId,
                 userName: userName,
                 country: country,
                 name: customName || drinkData.name,
@@ -852,8 +1282,18 @@
                 date: date,
                 time: time,
                 rating: currentRating,
+                hasPhoto: !!currentPhotoData,
+                photoType: currentPhotoData ? (currentPhotoData.url ? 'url' : 'data') : null,
                 timestamp: new Date(`${date}T${time}`).getTime()
             };
+            
+            if (currentPhotoData) {
+                try {
+                    await savePhotoToDB(drinkId, currentPhotoData);
+                } catch (error) {
+                    console.error('Error saving photo:', error);
+                }
+            }
             
             drinks.push(drink);
             saveData();
@@ -865,6 +1305,7 @@
             document.getElementById('rating').value = 0;
             document.getElementById('ratingValue').textContent = '0/10';
             updateStarDisplay(document.getElementById('starRating'), 0);
+            removePhoto();
             setCurrentDateTime();
         });
         
@@ -895,7 +1336,7 @@
             renderDrinksList();
         }
         
-        function renderDrinksList() {
+        async function renderDrinksList() {
             const container = document.getElementById('drinksList');
             
             if (drinks.length === 0) {
@@ -911,25 +1352,57 @@
                 return;
             }
             
-            container.innerHTML = drinks.map((drink, index) => `
-                <div class="drink-item">
-                    <div>
-                        <div class="drink-name">${drink.name}</div>
-                        <div class="drink-country">${drink.country}</div>
+            const drinkItems = await Promise.all(drinks.map(async (drink, index) => {
+                let photoHtml = '<div style="width: 60px; height: 60px; background: #f0f0f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #999;">No Photo</div>';
+                
+                if (drink.hasPhoto) {
+                    try {
+                        const photoData = await getPhotoFromDB(drink.id);
+                        if (photoData) {
+                            const imgSrc = photoData.url || photoData;
+                            photoHtml = `<img src="${imgSrc}" class="photo-thumbnail" onclick="showPhotoModal(${drink.id})" alt="Drink photo">`;
+                        }
+                    } catch (error) {
+                        console.error('Error loading photo:', error);
+                    }
+                }
+                
+                return `
+                    <div class="drink-item">
+                        ${photoHtml}
+                        <div>
+                            <div class="drink-name">${drink.name}</div>
+                            <div class="drink-country">${drink.country}</div>
+                        </div>
+                        <div class="drink-time">${drink.date}</div>
+                        <div class="drink-time">${drink.time}</div>
+                        <div class="drink-price">${drink.price.toFixed(2)}</div>
+                        <div class="drink-rating">
+                            <span>${drink.rating}</span>
+                            <span>⭐</span>
+                        </div>
+                        <div class="drink-actions">
+                            <button class="btn btn-edit" onclick="editDrink(${index})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteDrink(${index})">Delete</button>
+                        </div>
                     </div>
-                    <div class="drink-time">${drink.date}</div>
-                    <div class="drink-time">${drink.time}</div>
-                    <div class="drink-price">${drink.price.toFixed(2)}</div>
-                    <div class="drink-rating">
-                        <span>${drink.rating}</span>
-                        <span>⭐</span>
-                    </div>
-                    <div class="drink-actions">
-                        <button class="btn btn-edit" onclick="editDrink(${index})">Edit</button>
-                        <button class="btn btn-danger" onclick="deleteDrink(${index})">Delete</button>
-                    </div>
-                </div>
-            `).join('');
+                `;
+            }));
+            
+            container.innerHTML = drinkItems.join('');
+        }
+        
+        async function showPhotoModal(drinkId) {
+            try {
+                const photoData = await getPhotoFromDB(drinkId);
+                if (photoData) {
+                    const imgSrc = photoData.url || photoData;
+                    document.getElementById('photoModalImage').src = imgSrc;
+                    document.getElementById('photoModal').classList.add('active');
+                }
+            } catch (error) {
+                console.error('Error loading photo:', error);
+            }
         }
         
         function editDrink(index) {
@@ -975,8 +1448,16 @@
             closeEditModal();
         });
         
-        function deleteDrink(index) {
+        async function deleteDrink(index) {
             if (confirm('Are you sure you want to delete this drink?')) {
+                const drink = drinks[index];
+                if (drink.hasPhoto) {
+                    try {
+                        await deletePhotoFromDB(drink.id);
+                    } catch (error) {
+                        console.error('Error deleting photo:', error);
+                    }
+                }
                 drinks.splice(index, 1);
                 saveData();
                 updateDisplay();
@@ -1012,6 +1493,7 @@
             report += `Total Cost: ${totalCost.toFixed(2)}\n`;
             report += `Countries Visited: ${countries.size}\n`;
             report += `Average Rating: ${avgRating}/10\n`;
+            report += `Drinks with Photos: ${drinks.filter(d => d.hasPhoto).length}\n`;
             
             if (drinks.length > 0) {
                 const firstTime = drinks[0].timestamp;
@@ -1025,7 +1507,7 @@
             report += '\n=== TOP RATED DRINKS ===\n';
             const topDrinks = [...drinks].sort((a, b) => b.rating - a.rating).slice(0, 5);
             topDrinks.forEach((d, i) => {
-                report += `${i + 1}. ${d.name} (${d.country}) - ${d.rating}/10\n`;
+                report += `${i + 1}. ${d.name} (${d.country}) - ${d.rating}/10 ${d.hasPhoto ? '📸' : ''}\n`;
             });
             
             report += '\n=== DRINKS BY COUNTRY ===\n';
@@ -1035,22 +1517,38 @@
                 const countryAvgRating = (countryDrinks.reduce((sum, d) => sum + d.rating, 0) / countryDrinks.length).toFixed(1);
                 report += `\n${country} (${countryDrinks.length} drinks, ${countryCost.toFixed(2)}, avg rating: ${countryAvgRating}/10)\n`;
                 countryDrinks.forEach(d => {
-                    report += `  - ${d.name} | ${d.date} ${d.time} | ${d.price.toFixed(2)} | ${d.rating}/10\n`;
+                    report += `  - ${d.name} | ${d.date} ${d.time} | ${d.price.toFixed(2)} | ${d.rating}/10 ${d.hasPhoto ? '📸' : ''}\n`;
                 });
             });
             
             report += '\n=== CHRONOLOGICAL LIST ===\n';
             drinks.forEach((d, i) => {
-                report += `${i + 1}. ${d.name} (${d.country}) | ${d.date} ${d.time} | ${d.price.toFixed(2)} | ${d.rating}/10\n`;
+                report += `${i + 1}. ${d.name} (${d.country}) | ${d.date} ${d.time} | ${d.price.toFixed(2)} | ${d.rating}/10 ${d.hasPhoto ? '📸' : ''}\n`;
             });
             
             return report;
         }
         
-        function downloadData() {
+        async function downloadData() {
+            const photosToExport = {};
+            
+            for (const drink of drinks) {
+                if (drink.hasPhoto) {
+                    try {
+                        const photoData = await getPhotoFromDB(drink.id);
+                        if (photoData) {
+                            photosToExport[drink.id] = photoData;
+                        }
+                    } catch (error) {
+                        console.error('Error exporting photo:', error);
+                    }
+                }
+            }
+            
             const exportObj = {
                 userName: userName,
                 drinks: drinks,
+                photos: photosToExport,
                 exportDate: new Date().toISOString()
             };
             const dataStr = JSON.stringify(exportObj, null, 2);
@@ -1063,15 +1561,16 @@
             URL.revokeObjectURL(url);
         }
         
-        function importData(event) {
+        async function importData(event) {
             const file = event.target.files[0];
             if (!file) return;
             
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
                     const imported = JSON.parse(e.target.result);
                     const importedDrinks = imported.drinks || imported;
+                    const importedPhotos = imported.photos || {};
                     
                     const existingIds = new Set(drinks.map(d => d.id));
                     const newDrinks = importedDrinks.filter(d => !existingIds.has(d.id));
@@ -1082,15 +1581,30 @@
                         
                         if (merge) {
                             drinks = drinks.concat(newDrinks);
+                            for (const drink of newDrinks) {
+                                if (drink.hasPhoto && importedPhotos[drink.id]) {
+                                    await savePhotoToDB(drink.id, importedPhotos[drink.id]);
+                                }
+                            }
                             alert(`Merged ${newDrinks.length} new drinks!`);
                         } else {
                             drinks = importedDrinks;
+                            for (const drink of importedDrinks) {
+                                if (drink.hasPhoto && importedPhotos[drink.id]) {
+                                    await savePhotoToDB(drink.id, importedPhotos[drink.id]);
+                                }
+                            }
                             alert(`Replaced all data with ${importedDrinks.length} drinks!`);
                         }
                     } else {
                         const replace = confirm('No new drinks found. Replace all existing data?');
                         if (replace) {
                             drinks = importedDrinks;
+                            for (const drink of importedDrinks) {
+                                if (drink.hasPhoto && importedPhotos[drink.id]) {
+                                    await savePhotoToDB(drink.id, importedPhotos[drink.id]);
+                                }
+                            }
                             alert(`Replaced all data with ${importedDrinks.length} drinks!`);
                         } else {
                             alert('Import cancelled.');
@@ -1139,6 +1653,9 @@
             const myCountries = new Set(drinks.map(d => d.country));
             const friendCountries = new Set(friendDrinks.map(d => d.country));
             
+            const myPhotos = drinks.filter(d => d.hasPhoto).length;
+            const friendPhotos = friendDrinks.filter(d => d.hasPhoto).length;
+            
             const sharedDrinks = drinks.filter(myDrink => 
                 friendDrinks.some(fd => fd.name === myDrink.name)
             );
@@ -1162,6 +1679,7 @@
                                 <div>Total Cost: ${myTotalCost.toFixed(2)}</div>
                                 <div>Avg Rating: ${myAvgRating}/10</div>
                                 <div>Countries: ${myCountries.size}</div>
+                                <div>Photos: ${myPhotos} 📸</div>
                             </div>
                             <div class="comparison-item">
                                 <strong>${friendName}</strong>
@@ -1169,6 +1687,7 @@
                                 <div>Total Cost: ${friendTotalCost.toFixed(2)}</div>
                                 <div>Avg Rating: ${friendAvgRating}/10</div>
                                 <div>Countries: ${friendCountries.size}</div>
+                                <div>Photos: ${friendPhotos} 📸</div>
                             </div>
                         </div>
                     </div>
@@ -1180,7 +1699,7 @@
                             return `
                                 <div style="padding: 10px; background: #f8f9fa; margin: 5px 0; border-radius: 5px;">
                                     <strong>${d.name}</strong> (${d.country})<br>
-                                    ${userName}: ${d.rating}/10 | ${friendName}: ${friendDrink.rating}/10
+                                    ${userName}: ${d.rating}/10 ${d.hasPhoto ? '📸' : ''} | ${friendName}: ${friendDrink.rating}/10 ${friendDrink.hasPhoto ? '📸' : ''}
                                 </div>
                             `;
                         }).join('') : '<p>No shared drinks yet!</p>'}
@@ -1189,7 +1708,7 @@
                     <div class="comparison-section">
                         <h4>✨ Only ${userName} Tried (${onlyMine.length})</h4>
                         ${onlyMine.length > 0 ? onlyMine.slice(0, 5).map(d => 
-                            `<div style="padding: 5px; margin: 3px 0;">• ${d.name} (${d.country}) - ${d.rating}/10</div>`
+                            `<div style="padding: 5px; margin: 3px 0;">• ${d.name} (${d.country}) - ${d.rating}/10 ${d.hasPhoto ? '📸' : ''}</div>`
                         ).join('') : '<p>None</p>'}
                         ${onlyMine.length > 5 ? `<p>...and ${onlyMine.length - 5} more</p>` : ''}
                     </div>
@@ -1197,7 +1716,7 @@
                     <div class="comparison-section">
                         <h4>✨ Only ${friendName} Tried (${onlyFriend.length})</h4>
                         ${onlyFriend.length > 0 ? onlyFriend.slice(0, 5).map(d => 
-                            `<div style="padding: 5px; margin: 3px 0;">• ${d.name} (${d.country}) - ${d.rating}/10</div>`
+                            `<div style="padding: 5px; margin: 3px 0;">• ${d.name} (${d.country}) - ${d.rating}/10 ${d.hasPhoto ? '📸' : ''}</div>`
                         ).join('') : '<p>None</p>'}
                         ${onlyFriend.length > 5 ? `<p>...and ${onlyFriend.length - 5} more</p>` : ''}
                     </div>
@@ -1209,6 +1728,7 @@
                             <div>Most Spent: <strong>${myTotalCost > friendTotalCost ? userName : friendName}</strong> 💰</div>
                             <div>Highest Avg Rating: <strong>${myAvgRating > friendAvgRating ? userName : friendName}</strong> ⭐</div>
                             <div>Most Countries: <strong>${myCountries.size > friendCountries.size ? userName : friendName}</strong> 🌍</div>
+                            <div>Most Photos: <strong>${myPhotos > friendPhotos ? userName : friendName}</strong> 📸</div>
                         </div>
                     </div>
                 </div>
@@ -1221,9 +1741,20 @@
             document.getElementById('compareModal').classList.remove('active');
         }
         
-        function clearAllData() {
+        async function clearAllData() {
             if (confirm('Are you sure you want to delete ALL drink data? This cannot be undone!')) {
-                if (confirm('Really sure? This will permanently delete all ' + drinks.length + ' drinks!')) {
+                if (confirm('Really sure? This will permanently delete all ' + drinks.length + ' drinks and their photos!')) {
+                    // Delete all photos from IndexedDB
+                    for (const drink of drinks) {
+                        if (drink.hasPhoto) {
+                            try {
+                                await deletePhotoFromDB(drink.id);
+                            } catch (error) {
+                                console.error('Error deleting photo:', error);
+                            }
+                        }
+                    }
+                    
                     drinks = [];
                     saveData();
                     updateDisplay();
@@ -1241,6 +1772,12 @@
         document.getElementById('compareModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeCompareModal();
+            }
+        });
+        
+        document.getElementById('photoModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closePhotoModal();
             }
         });
         
